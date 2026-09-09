@@ -137,7 +137,7 @@ Renders every scenario — normal, warning, danger, fresh session, near-exhauste
 
 ## Legal notice
 
-Released under the [MIT License](LICENSE), Copyright © 2026 Francisco Panis Kaseker.
+Released under the [MIT License](LICENSE).
 
 This software is provided **"as is", without warranty of any kind**, express or implied. See the LICENSE file for the full text.
 
