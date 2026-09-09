@@ -140,6 +140,17 @@ clock_at() {
   date -d "@$1" +%H:%M 2>/dev/null || date -r "$1" +%H:%M 2>/dev/null || printf -- '--:--'
 }
 
+span_of() {
+  local secs=$1 h m
+  h=$(( secs / 3600 ))
+  m=$(( (secs % 3600) / 60 ))
+  if (( h > 0 )); then
+    printf '%dh%02dm' "$h" "$m"
+  else
+    printf '%dm' "$m"
+  fi
+}
+
 mtime_of() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf '0'
 }
@@ -233,9 +244,9 @@ now=$(date +%s)
 if (( reset_at > 0 && reset_at > now )); then
   left=$(( reset_at - now ))
   if (( left <= 1800 )); then reset_color="$C_AMBER"; else reset_color="$C_DIM"; fi
-  countdown="${reset_color}${G_TIMER}reset: $(clock_at "$now") ${G_ARROW} $(clock_at "$reset_at")${C_OFF}"
+  countdown="${reset_color}${G_TIMER}reset: $(span_of "$left") ${G_ARROW} $(clock_at "$reset_at")${C_OFF}"
 else
-  countdown="${C_DIM}${G_TIMER}reset: --:-- ${G_ARROW} --:--${C_OFF}"
+  countdown="${C_DIM}${G_TIMER}reset: -- ${G_ARROW} --:--${C_OFF}"
 fi
 
 branch="${f_branch:-}"
