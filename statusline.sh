@@ -140,17 +140,6 @@ clock_at() {
   date -d "@$1" +%H:%M 2>/dev/null || date -r "$1" +%H:%M 2>/dev/null || printf -- '--:--'
 }
 
-span_of() {
-  local secs=$1 h m
-  h=$(( secs / 3600 ))
-  m=$(( (secs % 3600) / 60 ))
-  if (( h > 0 )); then
-    printf '%dh%02dm' "$h" "$m"
-  else
-    printf '%dm' "$m"
-  fi
-}
-
 mtime_of() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf '0'
 }
@@ -227,8 +216,10 @@ quota=""
 q5=$(to_int "$f_5h_pct")
 q7=$(to_int "$f_7d_pct")
 if (( q5 >= 0 )); then
-  if (( q5 >= 80 )); then quota="${C_ROSE}5h:${q5}%${C_OFF}"
-  else quota="${C_DIM}5h:${q5}%${C_OFF}"; fi
+  if (( q5 >= 90 )); then q5_heat="$C_ROSE"
+  elif (( q5 >= 70 )); then q5_heat="$C_AMBER"
+  else q5_heat="$C_LIME"; fi
+  quota="${q5_heat}5h:${q5}%${C_OFF}"
 fi
 if (( q7 >= 0 )); then
   if [ -n "$quota" ]; then quota="${quota} "; fi
@@ -242,9 +233,9 @@ now=$(date +%s)
 if (( reset_at > 0 && reset_at > now )); then
   left=$(( reset_at - now ))
   if (( left <= 1800 )); then reset_color="$C_AMBER"; else reset_color="$C_DIM"; fi
-  countdown="${reset_color}${G_TIMER}$(span_of "$left") ${G_ARROW} $(clock_at "$reset_at")${C_OFF}"
+  countdown="${reset_color}${G_TIMER}reset: $(clock_at "$now") ${G_ARROW} $(clock_at "$reset_at")${C_OFF}"
 else
-  countdown="${C_DIM}${G_TIMER}-- ${G_ARROW} --:--${C_OFF}"
+  countdown="${C_DIM}${G_TIMER}reset: --:-- ${G_ARROW} --:--${C_OFF}"
 fi
 
 branch="${f_branch:-}"
@@ -292,8 +283,8 @@ fi
 
 row1="${C_VIOLET}${G_MARK}${C_OFF} ${C_CYAN}${model_label}${C_OFF}"
 row1="${row1}${DIVIDER}${gauge} ${heat}${pct}%${C_OFF}${alert}${tokens}"
+row1="${row1}${quota}${elapsed}"
 row1="${row1}${DIVIDER}${spend_color}\$${spend}${C_OFF}"
-row1="${row1}${elapsed}${quota}"
 
 segments=()
 if [ -n "$branch" ]; then

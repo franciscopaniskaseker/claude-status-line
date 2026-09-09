@@ -3,8 +3,8 @@
 A two-line status line for [Claude Code](https://claude.com/claude-code): model, context gauge with a live token count, session cost, rate-limit usage, git state, and a countdown to your next 5-hour quota reset.
 
 ```
-◆ Opus │ ████░░░░░░ 42% 84.2k/200k │ $1.23 │ 12m3s │ 5h:23% 7d:41%
-⎇ main* │ +156/-23 │ claude-status-line │ ⏳ 1h47m → 16:19
+◆ Opus │ ████░░░░░░ 42% 84.2k/200k │ 5h:23% 7d:41% │ 12m3s │ $1.23
+⎇ main* │ +156/-23 │ claude-status-line │ ⏳ reset: 14:32 → 16:19
 ```
 
 ---
@@ -25,9 +25,9 @@ Claude Code runs a `statusLine` command after each response and pipes it a JSON 
 | Model | `◆ Opus` | The model handling this session |
 | Context gauge | `████░░░░░░ 42%` | How full the context window is |
 | Tokens | `84.2k/200k` | Tokens in context vs. the window size |
-| Cost | `$1.23` | Session spend in USD |
-| Elapsed | `12m3s` | Wall-clock time in this session |
 | Rate limits | `5h:23% 7d:41%` | Percentage of your 5-hour and 7-day quota used |
+| Elapsed | `12m3s` | Wall-clock time in this session |
+| Cost | `$1.23` | Session spend in USD |
 
 The token figure is `input + cache_creation + cache_read` — precisely what occupies the window, so it always agrees with the percentage.
 
@@ -39,7 +39,7 @@ The token figure is `input + cache_creation + cache_read` — precisely what occ
 | Churn | `+156/-23` | Lines added/removed by Claude this session |
 | Directory | `claude-status-line` | Current working directory |
 | Badge | `⚙ security-reviewer` | Active subagent, or `⚙ worktree:name` |
-| Quota reset | `⏳ 1h47m → 16:19` | Time left on the 5-hour window, and the local clock time it resets |
+| Quota reset | `⏳ reset: 14:32 → 16:19` | Now, and the local clock time the 5-hour window resets |
 
 ### Colors
 
@@ -48,7 +48,8 @@ The token figure is `input + cache_creation + cache_read` — precisely what occ
 | Context | ≥ 70% | amber |
 | Context | ≥ 90% | red, plus a `⚠` |
 | Cost | ≥ $5 / ≥ $10 | amber / red |
-| Rate limit | ≥ 80% | red |
+| 5-hour limit | ≥ 70% / ≥ 90% | amber / red — same scale as the context gauge |
+| 7-day limit | ≥ 80% | red |
 | Quota reset | ≤ 30 min away | amber |
 
 Sections with nothing to say stay hidden: no cost yet, no elapsed time, no line churn, no git repo.
@@ -117,7 +118,7 @@ If `~/.claude/settings.json` contains invalid JSON, the installer backs it up, r
 - you are on a **Claude Pro or Max** plan (or behind a gateway with a spend limit), **and**
 - the session has already received **at least one response**.
 
-Before then — and on API-key or Team/Enterprise setups — the percentages are hidden and the countdown shows the placeholder `⏳ -- → --:--`. That is expected, not a bug. Claude Code also drops a window once it expires, so a just-reset window briefly shows the placeholder too.
+Before then — and on API-key or Team/Enterprise setups — the percentages are hidden and the countdown shows the placeholder `⏳ reset: --:-- → --:--`. That is expected, not a bug. Claude Code also drops a window once it expires, so a just-reset window briefly shows the placeholder too.
 
 The reset time is rendered as a 24-hour local clock, converted from the Unix timestamp Claude Code provides.
 
