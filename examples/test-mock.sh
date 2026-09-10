@@ -100,8 +100,22 @@ render "ASCII mode" "$(mk "$base")" CLAUDE_STATUSLINE_ASCII=1
 
 render "Nerd Font mode" "$(mk "$base")" CLAUDE_STATUSLINE_NERDFONT=1 COLORTERM=truecolor
 
-render "no truecolor (plain ANSI)" "$(mk "$base")" COLORTERM=
-
 render "empty payload" "{}" COLORTERM=truecolor
+
+# One rendering per color depth, plus the signals that stand in for COLORTERM
+# on terminals that never set it.
+BARE=(-u COLORTERM -u TERM_PROGRAM -u WT_SESSION -u MSYSTEM -u ConEmuANSI -u VTE_VERSION)
+
+render "truecolor via COLORTERM" "$(mk "$base")" "${BARE[@]}" COLORTERM=truecolor
+render "truecolor via Windows Terminal" "$(mk "$base")" "${BARE[@]}" TERM=xterm WT_SESSION=abc
+render "truecolor via Git Bash (mintty)" "$(mk "$base")" "${BARE[@]}" TERM=xterm MSYSTEM=MINGW64
+render "truecolor via VS Code" "$(mk "$base")" "${BARE[@]}" TERM=xterm TERM_PROGRAM=vscode
+render "256 colors (xterm-256color)" "$(mk "$base")" "${BARE[@]}" TERM=xterm-256color
+render "16 colors (plain PuTTY)" "$(mk "$base")" "${BARE[@]}" TERM=xterm
+render "16 colors + ASCII (PuTTY, no UTF-8)" "$(mk "$base")" "${BARE[@]}" TERM=xterm CLAUDE_STATUSLINE_ASCII=1
+render "unknown terminal falls back to 16" "$(mk "$base")" "${BARE[@]}" TERM=some-unknown-term
+render "NO_COLOR" "$(mk "$base")" "${BARE[@]}" TERM=xterm NO_COLOR=1
+render "TERM=dumb" "$(mk "$base")" "${BARE[@]}" TERM=dumb
+render "forced 256 via CLAUDE_STATUSLINE_COLOR" "$(mk "$base")" "${BARE[@]}" TERM=xterm CLAUDE_STATUSLINE_COLOR=256
 
 printf '\n'

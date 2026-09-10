@@ -57,6 +57,34 @@ The token figure is `input + cache_creation + cache_read` — precisely what occ
 
 Sections with nothing to say stay hidden: no cost yet, no elapsed time, no API time under a minute, no line churn, no git repo, no cache stats before the first response, and no effort on models without the setting.
 
+The gauge gradient is drawn at whatever color depth your terminal supports, and the script works that out for itself:
+
+| Depth | Detected from | Gauge |
+|---|---|---|
+| 24-bit | `COLORTERM=truecolor`/`24bit`, `TERM` containing `truecolor` or `-direct`, `WT_SESSION` (Windows Terminal), `ConEmuANSI=ON`, `MSYSTEM` (Git Bash / mintty), `KONSOLE_VERSION`, `VTE_VERSION` ≥ 3600, or `TERM_PROGRAM` naming iTerm2, WezTerm, VS Code, Hyper, Ghostty, Rio, Tabby or Warp | smooth 10-step gradient |
+| 256 | `TERM` containing `256color`, or Apple Terminal | 10-step gradient from the xterm cube |
+| 16 | anything else — **this is the floor, not "no color"** | green → yellow → red in the 8 base ANSI colors |
+| none | `NO_COLOR` set, `FORCE_COLOR=0`, or `TERM=dumb` | plain text |
+
+An unrecognised terminal gets 16 colors rather than none, so PuTTY, the Windows console, and bare `TERM=xterm` sessions still come out colored.
+
+### If someone's status line looks gray
+
+Have them run the built-in check — it prints the depth that was detected and the environment behind it:
+
+```bash
+~/.claude/statusline.sh --diagnose
+```
+
+Then set the override in their shell profile:
+
+| Symptom | Fix |
+|---|---|
+| Flat or washed-out gauge, but text is colored | `export CLAUDE_STATUSLINE_COLOR=truecolor` (or `256`) |
+| Colors garbled or invisible | `export CLAUDE_STATUSLINE_COLOR=16` |
+| Glyphs show as `â??` or boxes | `export CLAUDE_STATUSLINE_ASCII=1` — and in PuTTY set *Window → Translation → Remote character set* to **UTF-8**, which is not the default |
+| Raw `[38;2;…m` escape codes | An old Windows console without ANSI support — use Windows Terminal, or `export CLAUDE_STATUSLINE_COLOR=none` |
+
 ### Appearance options
 
 Set these in your shell profile:
@@ -66,7 +94,8 @@ Set these in your shell profile:
 | `CLAUDE_STATUSLINE_ASCII=1` | Pure ASCII — no Unicode, no box glyphs |
 | `CLAUDE_STATUSLINE_NERDFONT=1` | Nerd Font icons for the branch, clock, and badges |
 | `CLAUDE_STATUSLINE_POWERLINE=1` | Powerline separators (follows `NERDFONT` by default) |
-| `COLORTERM=truecolor` | 24-bit gradient on the gauge (most terminals set this already) |
+| `CLAUDE_STATUSLINE_COLOR=` | Force a color depth: `truecolor`, `256`, `16`, or `none`. Overrides detection |
+| `NO_COLOR=1` / `FORCE_COLOR=0..3` | Honored as usual; `CLAUDE_STATUSLINE_COLOR` wins over both |
 
 ## Requirements
 
@@ -131,7 +160,13 @@ The reset time is rendered as a 24-hour local clock, converted from the Unix tim
 ./examples/test-mock.sh
 ```
 
-Renders every scenario — normal, warning, danger, fresh session, near-exhausted quota, expired reset, 1M context, subagent, worktree, ASCII, Nerd Font, and an empty payload — from mock JSON, so you can check your terminal's fonts and colors before installing.
+Renders every scenario — normal, warning, danger, fresh session, near-exhausted quota, expired reset, 1M context, subagent, worktree, ASCII, Nerd Font, an empty payload, and one rendering per color depth — from mock JSON, so you can check your terminal's fonts and colors before installing.
+
+To check color support alone:
+
+```bash
+./statusline.sh --diagnose
+```
 
 ## Notes on behavior
 
