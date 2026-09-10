@@ -256,7 +256,7 @@ api_ms=$(to_int "$f_api_ms")
 if (( ms > 0 )); then
   elapsed="${DIVIDER}${C_DIM}$(dhm_of "$ms")"
   if (( api_ms >= 60000 )); then
-    elapsed="${elapsed} ($(dhm_of "$api_ms") api)"
+    elapsed="${elapsed} api:$(dhm_of "$api_ms")"
   fi
   elapsed="${elapsed}${C_OFF}"
 fi

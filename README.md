@@ -3,7 +3,7 @@
 A two-line status line for [Claude Code](https://claude.com/claude-code): model and reasoning effort, context gauge with a live token count, session cost, matching gauges for your 5-hour and 7-day quotas, prompt-cache health, git state, and a countdown to your next quota reset.
 
 ```
-◆ Opus·high │ ████░░░░░░ 42% 84.2k/200k │ 5h ██░░░░░░░░ 23% 7d ████░░░░░░ 41% │ 1h12m (18m api) │ $1.23
+◆ Opus·high │ ████░░░░░░ 42% 84.2k/200k │ 5h ██░░░░░░░░ 23% 7d ████░░░░░░ 41% │ 1h12m api:18m │ $1.23
 cache 91% │ ⎇ main* │ +156/-23 │ claude-status-line │ ⏳ reset: 1h47m → 16:19
 ```
 
@@ -27,7 +27,7 @@ Claude Code runs a `statusLine` command after each response and pipes it a JSON 
 | Tokens | `84.2k/200k` | Tokens in context vs. the window size |
 | 5-hour gauge | `5h ██░░░░░░░░ 23%` | How much of the 5-hour quota is spent |
 | 7-day gauge | `7d ████░░░░░░ 41%` | How much of the 7-day quota is spent |
-| Elapsed | `1h12m (18m api)` | Wall-clock time in this session, in whole days/hours/minutes, and how much of it was spent waiting on the API |
+| Elapsed | `1h12m api:18m` | Wall-clock time in this session, in whole days/hours/minutes, and how much of it was spent waiting on the API |
 | Cost | `$1.23` | Session spend in USD |
 
 The token figure is `input + cache_creation + cache_read` — precisely what occupies the window, so it always agrees with the percentage. The 5-hour and 7-day gauges use the same ten cells and the same green→red gradient as the context gauge, so a glance tells you which budget is running out first.
