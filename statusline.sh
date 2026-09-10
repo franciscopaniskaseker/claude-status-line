@@ -254,7 +254,7 @@ elapsed=""
 ms=$(to_int "$f_ms")
 api_ms=$(to_int "$f_api_ms")
 if (( ms > 0 )); then
-  elapsed="${DIVIDER}${C_DIM}$(dhm_of "$ms")"
+  elapsed="${C_DIM}$(dhm_of "$ms")"
   if (( api_ms >= 60000 )); then
     elapsed="${elapsed} api:$(dhm_of "$api_ms")"
   fi
@@ -301,7 +301,6 @@ if (( q7 >= 0 )); then
   if [ -n "$quota" ]; then quota="${quota} "; fi
   quota="${quota}${C_DIM}7d${C_OFF} ${q7_gauge} ${q7_heat}${q7}%${C_OFF}"
 fi
-if [ -n "$quota" ]; then quota="${DIVIDER}${quota}"; fi
 
 reset_at=$(to_int "$f_5h_at")
 now=$(date +%s)
@@ -356,12 +355,23 @@ if (( added > 0 || removed > 0 )); then
   churn="${C_LIME}+${added}${C_OFF}/${C_ROSE}-${removed}${C_OFF}"
 fi
 
-row1="${C_VIOLET}${G_MARK}${C_OFF} ${C_CYAN}${model_label}${C_OFF}${effort_tag}"
-row1="${row1}${DIVIDER}${gauge} ${heat}${pct}%${C_OFF}${alert}${tokens}"
-row1="${row1}${quota}${elapsed}"
-row1="${row1}${DIVIDER}${spend_color}\$${spend}${C_OFF}"
+row1_segments=()
+if [ -n "$quota" ]; then
+  row1_segments+=("$quota")
+fi
+row1_segments+=("${gauge} ${heat}${pct}%${C_OFF}${alert}${tokens}")
+if [ -n "$elapsed" ]; then
+  row1_segments+=("$elapsed")
+fi
+row1_segments+=("${spend_color}\$${spend}${C_OFF}")
 
-segments=()
+row1=""
+for (( i=0; i<${#row1_segments[@]}; i++ )); do
+  if (( i > 0 )); then row1="${row1}${DIVIDER}"; fi
+  row1="${row1}${row1_segments[$i]}"
+done
+
+segments=("${C_VIOLET}${G_MARK}${C_OFF} ${C_CYAN}${model_label}${C_OFF}${effort_tag}")
 if [ -n "$cache_seg" ]; then
   segments+=("$cache_seg")
 fi
