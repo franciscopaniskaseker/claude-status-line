@@ -225,11 +225,16 @@ else spend_color="$C_AMBER"; fi
 elapsed=""
 ms=$(to_int "$f_ms")
 if (( ms > 0 )); then
-  total_s=$(( ms / 1000 ))
-  e_m=$(( total_s / 60 ))
-  e_s=$(( total_s % 60 ))
-  if (( e_m > 0 || e_s > 0 )); then
-    elapsed="${DIVIDER}${C_DIM}${e_m}m${e_s}s${C_OFF}"
+  total_m=$(( ms / 60000 ))
+  e_d=$(( total_m / 1440 ))
+  e_h=$(( (total_m % 1440) / 60 ))
+  e_m=$(( total_m % 60 ))
+  if (( e_d > 0 )); then
+    elapsed="${DIVIDER}${C_DIM}${e_d}d${e_h}h${e_m}m${C_OFF}"
+  elif (( e_h > 0 )); then
+    elapsed="${DIVIDER}${C_DIM}${e_h}h${e_m}m${C_OFF}"
+  else
+    elapsed="${DIVIDER}${C_DIM}${e_m}m${C_OFF}"
   fi
 fi
 
