@@ -19,9 +19,11 @@ render() {
 
 base='{
   "model": {"display_name": "Opus"},
+  "effort": {"level": "high"},
   "context_window": {"used_percentage": 42, "total_input_tokens": 84231, "context_window_size": 200000},
-  "cost": {"total_cost_usd": 1.234, "total_duration_ms": 723000, "total_lines_added": 156, "total_lines_removed": 23},
+  "cost": {"total_cost_usd": 1.234, "total_duration_ms": 4320000, "total_api_duration_ms": 1080000, "total_lines_added": 156, "total_lines_removed": 23},
   "workspace": {"current_dir": "CWD"},
+  "prompt_cache": {"warm": true, "hit_ratio": 0.91},
   "rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": SOON}, "seven_day": {"used_percentage": 41.2, "resets_at": SOON}}
 }'
 
@@ -48,6 +50,16 @@ render "fresh session (no cost, no churn, no rate_limits)" "$(mk '{
   "context_window": {"used_percentage": 2, "total_input_tokens": 4200, "context_window_size": 200000},
   "cost": {"total_cost_usd": 0, "total_duration_ms": 0, "total_lines_added": 0, "total_lines_removed": 0},
   "workspace": {"current_dir": "CWD"}
+}')" COLORTERM=truecolor
+
+render "cold prompt cache" "$(mk '{
+  "model": {"display_name": "Opus"},
+  "effort": {"level": "medium"},
+  "context_window": {"used_percentage": 38, "total_input_tokens": 76000, "context_window_size": 200000},
+  "cost": {"total_cost_usd": 2.1, "total_duration_ms": 5400000, "total_api_duration_ms": 900000},
+  "workspace": {"current_dir": "CWD"},
+  "prompt_cache": {"warm": false, "hit_ratio": 0.42},
+  "rate_limits": {"five_hour": {"used_percentage": 44, "resets_at": SOON}}
 }')" COLORTERM=truecolor
 
 render "expired resets_at (in the past)" "$(mk '{

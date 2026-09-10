@@ -31,6 +31,7 @@ if [ "$MODE_ASCII" = "1" ]; then
   G_TIMER=""
   G_BADGE="* "
   G_ARROW="->"
+  G_DOT=":"
   DIVIDER=" | "
   CELL_ON="#"
   CELL_OFF="-"
@@ -41,6 +42,7 @@ elif [ "$MODE_NERD" = "1" ]; then
   G_TIMER="󰥔 "
   G_BADGE=" "
   G_ARROW="→"
+  G_DOT="·"
   CELL_ON="█"
   CELL_OFF="░"
   if [ "$MODE_POWERLINE" = "1" ]; then DIVIDER="  "; else DIVIDER=" │ "; fi
@@ -51,6 +53,7 @@ else
   G_TIMER="⏳ "
   G_BADGE="⚙ "
   G_ARROW="→"
+  G_DOT="·"
   CELL_ON="█"
   CELL_OFF="░"
   if [ "$MODE_POWERLINE" = "1" ]; then DIVIDER="  "; else DIVIDER=" │ "; fi
@@ -81,6 +84,11 @@ fields=$(printf '%s' "$payload" | jq -r '
   (.rate_limits.five_hour.used_percentage // -1 | tostring),
   (.rate_limits.five_hour.resets_at // -1 | tostring),
   (.rate_limits.seven_day.used_percentage // -1 | tostring),
+  (.effort.level // ""),
+  (.cost.total_api_duration_ms // 0 | tostring),
+  (if .prompt_cache == null then "0" else "1" end),
+  (.prompt_cache.warm // false | tostring),
+  ((.prompt_cache.hit_ratio // -1) * 100 | round | tostring),
   "END"
 ' 2>/dev/null) || bail "─ │ bad payload"
 
@@ -100,6 +108,11 @@ fields=$(printf '%s' "$payload" | jq -r '
   IFS= read -r f_5h_pct
   IFS= read -r f_5h_at
   IFS= read -r f_7d_pct
+  IFS= read -r f_effort
+  IFS= read -r f_api_ms
+  IFS= read -r f_cache_on
+  IFS= read -r f_cache_warm
+  IFS= read -r f_cache_hit
   IFS= read -r _end
 } <<< "$fields"
 
@@ -138,6 +151,21 @@ abbrev_tokens() {
 
 clock_at() {
   date -d "@$1" +%H:%M 2>/dev/null || date -r "$1" +%H:%M 2>/dev/null || printf -- '--:--'
+}
+
+# dhm_of <milliseconds> -> 5m | 1h12m | 1d1h0m
+dhm_of() {
+  local total_m=$(( $1 / 60000 )) d h m
+  d=$(( total_m / 1440 ))
+  h=$(( (total_m % 1440) / 60 ))
+  m=$(( total_m % 60 ))
+  if (( d > 0 )); then
+    printf '%dd%dh%dm' "$d" "$h" "$m"
+  elif (( h > 0 )); then
+    printf '%dh%dm' "$h" "$m"
+  else
+    printf '%dm' "$m"
+  fi
 }
 
 span_of() {
@@ -224,17 +252,32 @@ else spend_color="$C_AMBER"; fi
 
 elapsed=""
 ms=$(to_int "$f_ms")
+api_ms=$(to_int "$f_api_ms")
 if (( ms > 0 )); then
-  total_m=$(( ms / 60000 ))
-  e_d=$(( total_m / 1440 ))
-  e_h=$(( (total_m % 1440) / 60 ))
-  e_m=$(( total_m % 60 ))
-  if (( e_d > 0 )); then
-    elapsed="${DIVIDER}${C_DIM}${e_d}d${e_h}h${e_m}m${C_OFF}"
-  elif (( e_h > 0 )); then
-    elapsed="${DIVIDER}${C_DIM}${e_h}h${e_m}m${C_OFF}"
+  elapsed="${DIVIDER}${C_DIM}$(dhm_of "$ms")"
+  if (( api_ms >= 60000 )); then
+    elapsed="${elapsed} ($(dhm_of "$api_ms") api)"
+  fi
+  elapsed="${elapsed}${C_OFF}"
+fi
+
+effort_tag=""
+if [ -n "${f_effort:-}" ]; then
+  effort_tag="${C_DIM}${G_DOT}${f_effort}${C_OFF}"
+fi
+
+cache_seg=""
+if [ "${f_cache_on:-0}" = "1" ]; then
+  hit=$(to_int "$f_cache_hit")
+  if [ "${f_cache_warm:-false}" != "true" ]; then
+    cache_seg="${C_DIM}cache cold${C_OFF}"
+  elif (( hit < 0 )); then
+    cache_seg="${C_DIM}cache warm${C_OFF}"
   else
-    elapsed="${DIVIDER}${C_DIM}${e_m}m${C_OFF}"
+    if (( hit >= 80 )); then cache_heat="$C_LIME"
+    elif (( hit >= 50 )); then cache_heat="$C_AMBER"
+    else cache_heat="$C_ROSE"; fi
+    cache_seg="${C_DIM}cache${C_OFF} ${cache_heat}${hit}%${C_OFF}"
   fi
 fi
 
@@ -313,12 +356,15 @@ if (( added > 0 || removed > 0 )); then
   churn="${C_LIME}+${added}${C_OFF}/${C_ROSE}-${removed}${C_OFF}"
 fi
 
-row1="${C_VIOLET}${G_MARK}${C_OFF} ${C_CYAN}${model_label}${C_OFF}"
+row1="${C_VIOLET}${G_MARK}${C_OFF} ${C_CYAN}${model_label}${C_OFF}${effort_tag}"
 row1="${row1}${DIVIDER}${gauge} ${heat}${pct}%${C_OFF}${alert}${tokens}"
 row1="${row1}${quota}${elapsed}"
 row1="${row1}${DIVIDER}${spend_color}\$${spend}${C_OFF}"
 
 segments=()
+if [ -n "$cache_seg" ]; then
+  segments+=("$cache_seg")
+fi
 if [ -n "$branch" ]; then
   segments+=("${C_DIM}${G_VCS}${branch}${flag}${C_OFF}")
 fi
