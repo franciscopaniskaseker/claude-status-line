@@ -1,9 +1,9 @@
 # claude-status-line
 
-A two-line status line for [Claude Code](https://claude.com/claude-code): model, context gauge with a live token count, session cost, rate-limit usage, git state, and a countdown to your next 5-hour quota reset.
+A two-line status line for [Claude Code](https://claude.com/claude-code): model, context gauge with a live token count, session cost, matching gauges for your 5-hour and 7-day quotas, git state, and a countdown to your next quota reset.
 
 ```
-◆ Opus │ ████░░░░░░ 42% 84.2k/200k │ 5h:23% 7d:41% │ 12m3s │ $1.23
+◆ Opus │ ████░░░░░░ 42% 84.2k/200k │ 5h ██░░░░░░░░ 23% 7d ████░░░░░░ 41% │ 12m3s │ $1.23
 ⎇ main* │ +156/-23 │ claude-status-line │ ⏳ reset: 1h47m → 16:19
 ```
 
@@ -25,11 +25,12 @@ Claude Code runs a `statusLine` command after each response and pipes it a JSON 
 | Model | `◆ Opus` | The model handling this session |
 | Context gauge | `████░░░░░░ 42%` | How full the context window is |
 | Tokens | `84.2k/200k` | Tokens in context vs. the window size |
-| Rate limits | `5h:23% 7d:41%` | Percentage of your 5-hour and 7-day quota used |
+| 5-hour gauge | `5h ██░░░░░░░░ 23%` | How much of the 5-hour quota is spent |
+| 7-day gauge | `7d ████░░░░░░ 41%` | How much of the 7-day quota is spent |
 | Elapsed | `12m3s` | Wall-clock time in this session |
 | Cost | `$1.23` | Session spend in USD |
 
-The token figure is `input + cache_creation + cache_read` — precisely what occupies the window, so it always agrees with the percentage.
+The token figure is `input + cache_creation + cache_read` — precisely what occupies the window, so it always agrees with the percentage. The 5-hour and 7-day gauges use the same ten cells and the same green→red gradient as the context gauge, so a glance tells you which budget is running out first.
 
 ### Line 2 — the workspace
 
@@ -48,8 +49,8 @@ The token figure is `input + cache_creation + cache_read` — precisely what occ
 | Context | ≥ 70% | amber |
 | Context | ≥ 90% | red, plus a `⚠` |
 | Cost | ≥ $5 / ≥ $10 | amber / red |
-| 5-hour limit | ≥ 70% / ≥ 90% | amber / red — same scale as the context gauge |
-| 7-day limit | ≥ 80% | red |
+| 5-hour gauge | ≥ 70% / ≥ 90% | amber / red — same gradient as the context gauge |
+| 7-day gauge | ≥ 60% / ≥ 80% | amber / red |
 | Quota reset | ≤ 30 min away | amber |
 
 Sections with nothing to say stay hidden: no cost yet, no elapsed time, no line churn, no git repo.
@@ -113,7 +114,7 @@ If `~/.claude/settings.json` contains invalid JSON, the installer backs it up, r
 
 ## About the rate-limit segments
 
-`5h:`, `7d:`, and the reset countdown come from data that Claude Code only sends when:
+The `5h` and `7d` gauges and the reset countdown come from data that Claude Code only sends when:
 
 - you are on a **Claude Pro or Max** plan (or behind a gateway with a spend limit), **and**
 - the session has already received **at least one response**.

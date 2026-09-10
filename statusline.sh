@@ -155,6 +155,42 @@ mtime_of() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || printf '0'
 }
 
+RAMP_R=(46 116 186 241 239 236 233 231 211 192)
+RAMP_G=(204 195 186 196 161 126 101 76 66 57)
+RAMP_B=(113 89 64 15 24 34 44 60 50 43)
+
+GAUGE_WIDTH=10
+
+# render_gauge <percent 0-100> <cells> <fallback color>
+render_gauge() {
+  local value=$1 width=$2 fallback=$3
+  local i idx filled bar=""
+  if (( value < 0 )); then value=0; fi
+  if (( value > 100 )); then value=100; fi
+  filled=$(( value * width / 100 ))
+  if (( filled > width )); then filled=$width; fi
+  if [ "$MODE_ASCII" != "1" ] && (( MODE_TRUECOLOR )); then
+    for (( i=0; i<width; i++ )); do
+      if (( i < filled )); then
+        idx=$(( i * 10 / width ))
+        bar="${bar}"$'\033'"[38;2;${RAMP_R[$idx]};${RAMP_G[$idx]};${RAMP_B[$idx]}m${CELL_ON}"
+      else
+        bar="${bar}"$'\033'"[38;2;60;60;60m${CELL_OFF}"
+      fi
+    done
+    printf '%s%s' "$bar" "$C_OFF"
+    return
+  fi
+  for (( i=0; i<width; i++ )); do
+    if (( i < filled )); then bar="${bar}${CELL_ON}"; else bar="${bar}${CELL_OFF}"; fi
+  done
+  if [ "$MODE_ASCII" = "1" ]; then
+    printf '%s' "$bar"
+  else
+    printf '%s%s%s' "$fallback" "$bar" "$C_OFF"
+  fi
+}
+
 model_label="${f_model:-─}"
 
 pct=$(to_int "$f_ctx_pct")
@@ -165,33 +201,7 @@ if (( pct >= 90 )); then heat="$C_ROSE"
 elif (( pct >= 70 )); then heat="$C_AMBER"
 else heat="$C_LIME"; fi
 
-filled=$(( pct / 10 ))
-if (( filled > 10 )); then filled=10; fi
-
-RAMP_R=(46 116 186 241 239 236 233 231 211 192)
-RAMP_G=(204 195 186 196 161 126 101 76 66 57)
-RAMP_B=(113 89 64 15 24 34 44 60 50 43)
-
-gauge=""
-if [ "$MODE_ASCII" = "1" ]; then
-  for (( i=0; i<10; i++ )); do
-    if (( i < filled )); then gauge="${gauge}${CELL_ON}"; else gauge="${gauge}${CELL_OFF}"; fi
-  done
-elif (( MODE_TRUECOLOR )); then
-  for (( i=0; i<10; i++ )); do
-    if (( i < filled )); then
-      gauge="${gauge}"$'\033'"[38;2;${RAMP_R[$i]};${RAMP_G[$i]};${RAMP_B[$i]}m${CELL_ON}"
-    else
-      gauge="${gauge}"$'\033'"[38;2;60;60;60m${CELL_OFF}"
-    fi
-  done
-  gauge="${gauge}${C_OFF}"
-else
-  for (( i=0; i<10; i++ )); do
-    if (( i < filled )); then gauge="${gauge}${CELL_ON}"; else gauge="${gauge}${CELL_OFF}"; fi
-  done
-  gauge="${heat}${gauge}${C_OFF}"
-fi
+gauge=$(render_gauge "$pct" "$GAUGE_WIDTH" "$heat")
 
 alert=""
 if (( pct >= 90 )); then alert="${C_ROSE}${G_ALERT}${C_OFF}"; fi
@@ -227,15 +237,21 @@ quota=""
 q5=$(to_int "$f_5h_pct")
 q7=$(to_int "$f_7d_pct")
 if (( q5 >= 0 )); then
+  if (( q5 > 100 )); then q5=100; fi
   if (( q5 >= 90 )); then q5_heat="$C_ROSE"
   elif (( q5 >= 70 )); then q5_heat="$C_AMBER"
   else q5_heat="$C_LIME"; fi
-  quota="${q5_heat}5h:${q5}%${C_OFF}"
+  q5_gauge=$(render_gauge "$q5" "$GAUGE_WIDTH" "$q5_heat")
+  quota="${C_DIM}5h${C_OFF} ${q5_gauge} ${q5_heat}${q5}%${C_OFF}"
 fi
 if (( q7 >= 0 )); then
+  if (( q7 > 100 )); then q7=100; fi
+  if (( q7 >= 80 )); then q7_heat="$C_ROSE"
+  elif (( q7 >= 60 )); then q7_heat="$C_AMBER"
+  else q7_heat="$C_LIME"; fi
+  q7_gauge=$(render_gauge "$q7" "$GAUGE_WIDTH" "$q7_heat")
   if [ -n "$quota" ]; then quota="${quota} "; fi
-  if (( q7 >= 80 )); then quota="${quota}${C_ROSE}7d:${q7}%${C_OFF}"
-  else quota="${quota}${C_DIM}7d:${q7}%${C_OFF}"; fi
+  quota="${quota}${C_DIM}7d${C_OFF} ${q7_gauge} ${q7_heat}${q7}%${C_OFF}"
 fi
 if [ -n "$quota" ]; then quota="${DIVIDER}${quota}"; fi
 
