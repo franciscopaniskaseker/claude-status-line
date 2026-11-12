@@ -8,6 +8,7 @@ NOW="$(date +%s)"
 SOON=$(( NOW + 6420 ))
 NEAR=$(( NOW + 900 ))
 PAST=$(( NOW - 300 ))
+LATER=$(( NOW + 353700 ))
 CWD="$(cd "$HERE/.." && pwd)"
 
 render() {
@@ -28,7 +29,7 @@ base='{
 }'
 
 mk() {
-  printf '%s' "$1" | sed -e "s#CWD#$CWD#g" -e "s#SOON#$SOON#g" -e "s#NEAR#$NEAR#g" -e "s#PAST#$PAST#g"
+  printf '%s' "$1" | sed -e "s#CWD#$CWD#g" -e "s#SOON#$SOON#g" -e "s#NEAR#$NEAR#g" -e "s#PAST#$PAST#g" -e "s#LATER#$LATER#g"
 }
 
 render "normal" "$(mk "$base")" COLORTERM=truecolor
@@ -60,6 +61,33 @@ render "cold prompt cache" "$(mk '{
   "workspace": {"current_dir": "CWD"},
   "prompt_cache": {"warm": false, "hit_ratio": 0.42},
   "rate_limits": {"five_hour": {"used_percentage": 44, "resets_at": SOON}}
+}')" COLORTERM=truecolor
+
+render "cache not reported by provider (caching_observed: false)" "$(mk '{
+  "model": {"display_name": "Opus"},
+  "context_window": {"used_percentage": 38, "total_input_tokens": 76000, "context_window_size": 200000},
+  "cost": {"total_cost_usd": 2.1, "total_duration_ms": 5400000},
+  "workspace": {"current_dir": "CWD"},
+  "prompt_cache": {"warm": false, "caching_observed": false, "hit_ratio": null},
+  "rate_limits": {"five_hour": {"used_percentage": 44, "resets_at": SOON}}
+}')" COLORTERM=truecolor
+
+render "no 5-hour window (weekly only, e.g. Ultra) - countdown falls back to 7d" "$(mk '{
+  "model": {"display_name": "Opus"},
+  "effort": {"level": "xhigh"},
+  "context_window": {"used_percentage": 42, "total_input_tokens": 84231, "context_window_size": 200000},
+  "cost": {"total_cost_usd": 1.234, "total_duration_ms": 4320000, "total_api_duration_ms": 1080000},
+  "workspace": {"current_dir": "CWD"},
+  "prompt_cache": {"warm": true, "caching_observed": true, "hit_ratio": 0.91},
+  "rate_limits": {"seven_day": {"used_percentage": 18.4, "resets_at": LATER}}
+}')" COLORTERM=truecolor
+
+render "gateway spend limit, over budget" "$(mk '{
+  "model": {"display_name": "Sonnet"},
+  "context_window": {"used_percentage": 20, "total_input_tokens": 40000, "context_window_size": 200000},
+  "cost": {"total_cost_usd": 3.4, "total_duration_ms": 1800000},
+  "workspace": {"current_dir": "CWD"},
+  "rate_limits": {"spend_limit": {"used_percentage": 112.5, "resets_at": LATER, "used_usd": 56.25, "limit_usd": 50, "period": "monthly"}}
 }')" COLORTERM=truecolor
 
 render "expired resets_at (in the past)" "$(mk '{

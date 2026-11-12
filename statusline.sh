@@ -170,6 +170,13 @@ clock_at() {
   date -d "@$1" +%H:%M 2>/dev/null || date -r "$1" +%H:%M 2>/dev/null || printf -- '--:--'
 }
 
+# when_at <epoch> <seconds from now> -> 16:19, or "Mon 09:00" once the moment
+# is a day or more away and a bare clock time would be ambiguous.
+when_at() {
+  if (( $2 < 86400 )); then clock_at "$1"; return; fi
+  date -d "@$1" '+%a %H:%M' 2>/dev/null || date -r "$1" '+%a %H:%M' 2>/dev/null || printf -- '--- --:--'
+}
+
 # dhm_of <milliseconds> -> 5m | 1h12m | 1d1h0m
 dhm_of() {
   local total_m=$(( $1 / 60000 )) d h m
@@ -185,11 +192,15 @@ dhm_of() {
   fi
 }
 
+# span_of <seconds> -> 47m | 1h47m | 4d2h (minutes stop mattering past a day)
 span_of() {
-  local secs=$1 h m
-  h=$(( secs / 3600 ))
+  local secs=$1 d h m
+  d=$(( secs / 86400 ))
+  h=$(( (secs % 86400) / 3600 ))
   m=$(( (secs % 3600) / 60 ))
-  if (( h > 0 )); then
+  if (( d > 0 )); then
+    printf '%dd%dh' "$d" "$h"
+  elif (( h > 0 )); then
     printf '%dh%02dm' "$h" "$m"
   else
     printf '%dm' "$m"
@@ -306,9 +317,14 @@ fields=$(printf '%s' "$payload" | jq -r '
   (.rate_limits.seven_day.used_percentage // -1 | tostring),
   (.effort.level // ""),
   (.cost.total_api_duration_ms // 0 | tostring),
-  (if .prompt_cache == null then "0" else "1" end),
+  (if .prompt_cache == null or .prompt_cache.caching_observed == false then "0" else "1" end),
   (.prompt_cache.warm // false | tostring),
   ((.prompt_cache.hit_ratio // -1) * 100 | round | tostring),
+  (.rate_limits.seven_day.resets_at // -1 | tostring),
+  (.rate_limits.spend_limit.used_percentage // -1 | tostring),
+  (.rate_limits.spend_limit.resets_at // -1 | tostring),
+  (.rate_limits.spend_limit.used_usd // -1 | tostring),
+  (.rate_limits.spend_limit.limit_usd // -1 | tostring),
   "END"
 ' 2>/dev/null) || bail "─ │ bad payload"
 
@@ -333,6 +349,11 @@ fields=$(printf '%s' "$payload" | jq -r '
   IFS= read -r f_cache_on
   IFS= read -r f_cache_warm
   IFS= read -r f_cache_hit
+  IFS= read -r f_7d_at
+  IFS= read -r f_sp_pct
+  IFS= read -r f_sp_at
+  IFS= read -r f_sp_used
+  IFS= read -r f_sp_limit
   IFS= read -r _end
 } <<< "$fields"
 
@@ -420,12 +441,47 @@ if (( q7 >= 0 )); then
   quota="${quota}${C_DIM}7d${C_OFF} ${q7_gauge} ${q7_heat}${q7}%${C_OFF}"
 fi
 
-reset_at=$(to_int "$f_5h_at")
+# A Claude gateway can impose a spend limit of its own. It runs past 100% once
+# exceeded, so the gauge pins full while the number keeps telling the truth.
+qs=$(to_int "$f_sp_pct")
+if (( qs >= 0 )); then
+  if (( qs >= 90 )); then qs_heat="$C_ROSE"
+  elif (( qs >= 70 )); then qs_heat="$C_AMBER"
+  else qs_heat="$C_LIME"; fi
+  qs_gauge=$(render_gauge "$qs" "$GAUGE_WIDTH")
+  qs_usd=""
+  sp_used=$(to_int "$f_sp_used")
+  sp_limit=$(to_int "$f_sp_limit")
+  if (( sp_used >= 0 && sp_limit > 0 )); then
+    qs_usd=" ${C_DIM}\$${sp_used}/\$${sp_limit}${C_OFF}"
+  fi
+  if [ -n "$quota" ]; then quota="${quota} "; fi
+  quota="${quota}${C_DIM}spend${C_OFF} ${qs_gauge} ${qs_heat}${qs}%${C_OFF}${qs_usd}"
+fi
+
+# Count down to the 5-hour reset. Plans without a 5-hour window (Claude Code
+# omits five_hour when the API stops reporting it) fall back to the weekly
+# reset, then to a gateway spend limit's, each labelled so a multi-day
+# countdown is never mistaken for the 5-hour one.
 now=$(date +%s)
-if (( reset_at > 0 && reset_at > now )); then
+reset_at=0
+reset_tag=""
+at_5h=$(to_int "$f_5h_at")
+at_7d=$(to_int "$f_7d_at")
+at_sp=$(to_int "$f_sp_at")
+if (( at_5h > now )); then
+  reset_at=$at_5h
+elif (( at_7d > now )); then
+  reset_at=$at_7d
+  reset_tag="7d "
+elif (( at_sp > now )); then
+  reset_at=$at_sp
+  reset_tag="spend "
+fi
+if (( reset_at > 0 )); then
   left=$(( reset_at - now ))
   if (( left <= 1800 )); then reset_color="$C_AMBER"; else reset_color="$C_DIM"; fi
-  countdown="${reset_color}${G_TIMER}reset: $(span_of "$left") ${G_ARROW} $(clock_at "$reset_at")${C_OFF}"
+  countdown="${reset_color}${G_TIMER}${reset_tag}reset: $(span_of "$left") ${G_ARROW} $(when_at "$reset_at" "$left")${C_OFF}"
 else
   countdown="${C_DIM}${G_TIMER}reset: -- ${G_ARROW} --:--${C_OFF}"
 fi

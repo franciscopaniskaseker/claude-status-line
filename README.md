@@ -24,6 +24,7 @@ Claude Code runs a `statusLine` command after each response and pipes it a JSON 
 |---|---|---|
 | 5-hour gauge | `5h ██░░░░░░░░ 23%` | How much of the 5-hour quota is spent |
 | 7-day gauge | `7d ████░░░░░░ 41%` | How much of the 7-day quota is spent |
+| Spend-limit gauge | `spend ██████░░░░ 62% $31/$50` | Behind a Claude gateway that sets you a spend limit: how much of it is used, in USD when the gateway reports it |
 | Context gauge | `████░░░░░░ 42%` | How full the context window is |
 | Tokens | `84.2k/200k` | Tokens in context vs. the window size |
 | Elapsed | `1h12m api:18m` | Wall-clock time in this session, in whole days/hours/minutes, and how much of it was spent waiting on the API |
@@ -36,12 +37,12 @@ The token figure is `input + cache_creation + cache_read` — precisely what occ
 | Segment | Example | Meaning |
 |---|---|---|
 | Model | `◆ Opus·high` | The model handling this session, and its reasoning effort when the model supports one |
-| Prompt cache | `cache 91%` | Share of this session's input tokens served from the prompt cache; reads `cache cold` when the cached prefix has expired |
+| Prompt cache | `cache 91%` | Share of this session's input tokens served from the prompt cache; reads `cache cold` when the cached prefix has expired, and stays hidden when the provider reports no cache tokens at all |
 | Branch | `⎇ main*` | Git branch; `*` means uncommitted changes |
 | Churn | `+156/-23` | Lines added/removed by Claude this session |
 | Directory | `claude-status-line` | Current working directory |
 | Badge | `⚙ security-reviewer` | Active subagent, or `⚙ worktree:name` |
-| Quota reset | `⏳ reset: 1h47m → 16:19` | Time left on the 5-hour window, and the local clock time it resets |
+| Quota reset | `⏳ reset: 1h47m → 16:19` | Time left on the 5-hour window, and the local clock time it resets. Without a 5-hour window it counts down to the weekly reset instead, e.g. `⏳ 7d reset: 4d2h → Mon 09:00` |
 
 ### Colors
 
@@ -52,10 +53,11 @@ The token figure is `input + cache_creation + cache_read` — precisely what occ
 | Cost | ≥ $5 / ≥ $10 | amber / red |
 | 5-hour gauge | ≥ 70% / ≥ 90% | amber / red — same gradient as the context gauge |
 | 7-day gauge | ≥ 60% / ≥ 80% | amber / red |
+| Spend-limit gauge | ≥ 70% / ≥ 90% | amber / red; the number keeps counting past 100% |
 | Quota reset | ≤ 30 min away | amber |
 | Prompt cache | < 80% / < 50% hit ratio | amber / red |
 
-Sections with nothing to say stay hidden: no cost yet, no elapsed time, no API time under a minute, no line churn, no git repo, no cache stats before the first response, and no effort on models without the setting.
+Sections with nothing to say stay hidden: no cost yet, no elapsed time, no API time under a minute, no line churn, no git repo, no cache stats before the first response or from a provider that does not report them, no gauge for a quota window your plan does not have, and no effort on models without the setting.
 
 The gauge gradient is drawn at whatever color depth your terminal supports, and the script works that out for itself:
 
@@ -145,12 +147,22 @@ If `~/.claude/settings.json` contains invalid JSON, the installer backs it up, r
 
 ## About the rate-limit segments
 
-The `5h` and `7d` gauges and the reset countdown come from data that Claude Code only sends when:
+The `5h`, `7d` and `spend` gauges and the reset countdown come from the `rate_limits` data Claude Code sends. It only sends it when:
 
-- you are on a **Claude Pro or Max** plan (or behind a gateway with a spend limit), **and**
+- you are on a Claude subscription plan, or behind a Claude gateway that sets you a spend limit, **and**
 - the session has already received **at least one response**.
 
-Before then — and on API-key or Team/Enterprise setups — the percentages are hidden and the countdown shows the placeholder `⏳ reset: -- → --:--`. That is expected, not a bug. Claude Code also drops a window once it expires, so a just-reset window briefly shows the placeholder too.
+Each window is reported on its own, and only while it applies. The script draws a gauge for each window that is present and hides the rest:
+
+| Window | Gauge | Present when |
+|---|---|---|
+| 5-hour | `5h` | your plan has a 5-hour limit |
+| 7-day | `7d` | your plan has a weekly limit |
+| Gateway spend limit | `spend` | a Claude gateway sets you a spend limit |
+
+The countdown follows the first of those windows that has a reset time still ahead. It shows the 5-hour reset whenever there is one. Plans without a 5-hour limit (the Ultra plan, for example) get the weekly reset instead, labelled `7d reset:`. A gateway spend limit's reset is labelled `spend reset:`. A reset a day or more away shows the weekday as well as the time, since a bare clock time would be ambiguous.
+
+When no window is present (before the first response, or with an API key) the gauges are hidden and the countdown shows the placeholder `⏳ reset: -- → --:--`. That is expected, not a bug. Claude Code also drops a window once it expires. Until the next response brings the new one, its gauge disappears and the countdown moves to the next live window (a just-expired 5-hour window briefly shows `7d reset:`), or to the placeholder if none is left.
 
 The reset time is rendered as a 24-hour local clock, converted from the Unix timestamp Claude Code provides.
 
@@ -160,7 +172,7 @@ The reset time is rendered as a 24-hour local clock, converted from the Unix tim
 ./examples/test-mock.sh
 ```
 
-Renders every scenario — normal, warning, danger, fresh session, near-exhausted quota, expired reset, 1M context, subagent, worktree, ASCII, Nerd Font, an empty payload, and one rendering per color depth — from mock JSON, so you can check your terminal's fonts and colors before installing.
+Renders every scenario — normal, warning, danger, fresh session, near-exhausted quota, cold cache, a provider without cache reporting, a plan with no 5-hour window, a gateway spend limit, expired reset, 1M context, subagent, worktree, ASCII, Nerd Font, an empty payload, and one rendering per color depth — from mock JSON, so you can check your terminal's fonts and colors before installing.
 
 To check color support alone:
 
